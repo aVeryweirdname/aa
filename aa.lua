@@ -10017,6 +10017,7 @@ addCommand({
                 if hum then
                     hum.MaxHealth = 100
                     hum.Health = 100
+                    hum.BreakJointsOnDeath = true
                     hum:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
                     hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
                     hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
@@ -10039,17 +10040,14 @@ addCommand({
         local rebuildingJoints = false
 
         local jointNames = {
-            "Left Shoulder", "Right Shoulder", "Left Hip", "Right Hip", "Neck",
-            "RootJoint", "Root Hip"
+            "Left Shoulder", "Right Shoulder", "Left Hip", "Right Hip", "Neck", "RootJoint"
         }
 
         local function lockAllParts(character)
             for _, part in ipairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then
                     part.Locked = true
-                    if part.Name ~= "HumanoidRootPart" then
-                        part.Anchored = false
-                    end
+                    part.Anchored = false
                 end
             end
         end
@@ -10073,19 +10071,20 @@ addCommand({
 
             local function ensureJoint(parent, name, part0, part1, c0, c1)
                 local existing = parent:FindFirstChild(name)
-                if existing then
+                if existing and existing:IsA("Motor6D") then
                     existing.Part0 = part0
                     existing.Part1 = part1
-                    if c0 then existing.C0 = c0 end
-                    if c1 then existing.C1 = c1 end
+                    existing.C0 = c0
+                    existing.C1 = c1
                     return existing
                 end
+                if existing then existing:Destroy() end
                 local joint = Instance.new("Motor6D")
                 joint.Name = name
                 joint.Part0 = part0
                 joint.Part1 = part1
-                if c0 then joint.C0 = c0 end
-                if c1 then joint.C1 = c1 end
+                joint.C0 = c0
+                joint.C1 = c1
                 joint.Parent = parent
                 return joint
             end
@@ -10104,14 +10103,14 @@ addCommand({
 
             if leftArm then
                 ensureJoint(torso, "Left Shoulder", torso, leftArm,
-                    CFrame.new(-1.5, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0),
+                    CFrame.new(-1, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0),
                     CFrame.new(0.5, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0)
                 )
             end
 
             if rightArm then
                 ensureJoint(torso, "Right Shoulder", torso, rightArm,
-                    CFrame.new(1.5, 0.5, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0),
+                    CFrame.new(1, 0.5, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0),
                     CFrame.new(-0.5, 0.5, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0)
                 )
             end
@@ -10119,19 +10118,41 @@ addCommand({
             if leftLeg then
                 ensureJoint(torso, "Left Hip", torso, leftLeg,
                     CFrame.new(-0.5, -1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0),
-                    CFrame.new(-0.5, 1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0)
+                    CFrame.new(0, 1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0)
                 )
             end
 
             if rightLeg then
                 ensureJoint(torso, "Right Hip", torso, rightLeg,
                     CFrame.new(0.5, -1, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0),
-                    CFrame.new(0.5, 1, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0)
+                    CFrame.new(0, 1, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0)
                 )
             end
 
             lockAllParts(character)
             rebuildingJoints = false
+        end
+
+        local function reattachAccessories(character)
+            for _, item in ipairs(character:GetChildren()) do
+                if item:IsA("Accessory") then
+                    local handle = item:FindFirstChild("Handle")
+                    if handle then
+                        handle.CanCollide = false
+                        handle.Massless = true
+                        local existing = handle:FindFirstChildOfClass("WeldConstraint")
+                        if not existing then
+                            local hrp2 = character:FindFirstChild("HumanoidRootPart")
+                            if hrp2 then
+                                local w = Instance.new("WeldConstraint")
+                                w.Part0 = handle
+                                w.Part1 = hrp2
+                                w.Parent = handle
+                            end
+                        end
+                    end
+                end
+            end
         end
 
         local function buildShieldAndProtect(character)
@@ -10176,8 +10197,8 @@ addCommand({
             end
 
             rebuildJoints(character)
-
             lockAllParts(character)
+            reattachAccessories(character)
         end
 
         local function fullProtectionLoop(character)
@@ -10225,10 +10246,29 @@ addCommand({
                 task.spawn(function()
                     task.wait(0.05)
                     rebuildJoints(character)
-                    if savedCFrame and hrp and hrp.Parent then
-                        hrp.CFrame = savedCFrame
+                    reattachAccessories(character)
+                    local currentHrp = character:FindFirstChild("HumanoidRootPart")
+                    if savedCFrame and currentHrp and currentHrp.Parent then
+                        currentHrp.CFrame = savedCFrame
                     end
                 end)
+            end)
+
+            local accessoryDropConn = character.ChildRemoved:Connect(function(child)
+                if not _G.AntiKillActive[target.UserId] then return end
+                if child:IsA("Accessory") then
+                    task.spawn(function()
+                        task.wait(0.05)
+                        if child and child.Parent == nil then
+                            child.Parent = character
+                            local handle = child:FindFirstChild("Handle")
+                            if handle then
+                                handle.CanCollide = false
+                                handle.Massless = true
+                            end
+                        end
+                    end)
+                end
             end)
 
             local childRemovedConn = character.ChildRemoved:Connect(function(child)
@@ -10248,8 +10288,8 @@ addCommand({
                     end
 
                     if child:IsA("Motor6D") or child.Name == "Torso" or child.Name == "Head"
-                    or child.Name == "Left Arm" or child.Name == "Right Arm"
-                    or child.Name == "Left Leg" or child.Name == "Right Leg" then
+                        or child.Name == "Left Arm" or child.Name == "Right Arm"
+                        or child.Name == "Left Leg" or child.Name == "Right Leg" then
                         rebuildJoints(character)
                     end
 
@@ -10268,10 +10308,10 @@ addCommand({
 
             local descendantRemovedConn = character.DescendantRemoving:Connect(function(desc)
                 if not _G.AntiKillActive[target.UserId] then return end
-                if desc:IsA("Motor6D") or desc:IsA("Weld") or desc:IsA("WeldConstraint") then
+                if desc:IsA("Motor6D") then
                     if desc.Name == "RootJoint" or desc.Name == "Neck"
-                    or desc.Name == "Left Shoulder" or desc.Name == "Right Shoulder"
-                    or desc.Name == "Left Hip" or desc.Name == "Right Hip" then
+                        or desc.Name == "Left Shoulder" or desc.Name == "Right Shoulder"
+                        or desc.Name == "Left Hip" or desc.Name == "Right Hip" then
                         task.spawn(function()
                             task.wait(0.03)
                             if character.Parent then
@@ -10322,7 +10362,10 @@ addCommand({
                 if torso and not rebuildingJoints then
                     local missingJoint = false
                     for _, jname in ipairs(jointNames) do
-                        local j = torso:FindFirstChild(jname) or (character:FindFirstChild("HumanoidRootPart") and character.HumanoidRootPart:FindFirstChild(jname))
+                        local j = torso:FindFirstChild(jname)
+                        if not j and jname == "RootJoint" then
+                            j = currentHrp:FindFirstChild("RootJoint")
+                        end
                         if not j then
                             missingJoint = true
                             break
@@ -10344,6 +10387,7 @@ addCommand({
             table.insert(_G.AntiKillConnections[target.UserId], maxhealthConn)
             table.insert(_G.AntiKillConnections[target.UserId], stateConn)
             table.insert(_G.AntiKillConnections[target.UserId], diedConn)
+            table.insert(_G.AntiKillConnections[target.UserId], accessoryDropConn)
             table.insert(_G.AntiKillConnections[target.UserId], childRemovedConn)
             table.insert(_G.AntiKillConnections[target.UserId], descendantRemovedConn)
             table.insert(_G.AntiKillConnections[target.UserId], heartbeatConn)
