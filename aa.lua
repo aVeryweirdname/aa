@@ -10052,6 +10052,75 @@ addCommand({
             end
         end
 
+        local function restoreAnimations(character)
+            local hum = character:FindFirstChildOfClass("Humanoid")
+            if not hum then return end
+
+            local animController = character:FindFirstChildOfClass("AnimationController")
+                or character:FindFirstChild("Animate")
+
+            local animate = character:FindFirstChild("Animate")
+            if animate then
+                animate.Disabled = true
+                task.wait(0.05)
+                animate.Disabled = false
+                return
+            end
+
+            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+            if not humanoidRootPart then return end
+
+            for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+                track:Stop()
+            end
+
+            local idleAnim = Instance.new("Animation")
+            idleAnim.AnimationId = "rbxassetid://180435571"
+            local track = hum:LoadAnimation(idleAnim)
+            track:Play()
+        end
+
+        local function reattachAccessories(character)
+            local hrp2 = character:FindFirstChild("HumanoidRootPart")
+            local head = character:FindFirstChild("Head")
+
+            for _, item in ipairs(character:GetChildren()) do
+                if item:IsA("Accessory") then
+                    local handle = item:FindFirstChild("Handle")
+                    if handle then
+                        handle.CanCollide = false
+                        handle.Massless = true
+
+                        local existingWeld = handle:FindFirstChildOfClass("Weld")
+                            or handle:FindFirstChildOfClass("WeldConstraint")
+
+                        if not existingWeld then
+                            local attachPoint = head or hrp2
+                            if attachPoint then
+                                local w = Instance.new("WeldConstraint")
+                                w.Part0 = handle
+                                w.Part1 = attachPoint
+                                w.Parent = handle
+                            end
+                        else
+                            if existingWeld:IsA("Weld") then
+                                if not existingWeld.Part0 or not existingWeld.Part1 then
+                                    existingWeld:Destroy()
+                                    local attachPoint = head or hrp2
+                                    if attachPoint then
+                                        local w = Instance.new("WeldConstraint")
+                                        w.Part0 = handle
+                                        w.Part1 = attachPoint
+                                        w.Parent = handle
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
         local function rebuildJoints(character)
             if rebuildingJoints then return end
             rebuildingJoints = true
@@ -10133,26 +10202,27 @@ addCommand({
             rebuildingJoints = false
         end
 
-        local function reattachAccessories(character)
-            for _, item in ipairs(character:GetChildren()) do
-                if item:IsA("Accessory") then
-                    local handle = item:FindFirstChild("Handle")
-                    if handle then
-                        handle.CanCollide = false
-                        handle.Massless = true
-                        local existing = handle:FindFirstChildOfClass("WeldConstraint")
-                        if not existing then
-                            local hrp2 = character:FindFirstChild("HumanoidRootPart")
-                            if hrp2 then
-                                local w = Instance.new("WeldConstraint")
-                                w.Part0 = handle
-                                w.Part1 = hrp2
-                                w.Parent = handle
-                            end
-                        end
-                    end
-                end
-            end
+        local function rebuildHumanoid(character)
+            local existing = character:FindFirstChildOfClass("Humanoid")
+            if existing then existing:Destroy() end
+
+            local newHum = Instance.new("Humanoid")
+            newHum.MaxHealth = math.huge
+            newHum.Health = math.huge
+            newHum.BreakJointsOnDeath = false
+            newHum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+            newHum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+            newHum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+            newHum.Parent = character
+
+            task.wait(0.05)
+            rebuildJoints(character)
+            reattachAccessories(character)
+
+            task.wait(0.05)
+            restoreAnimations(character)
+
+            return newHum
         end
 
         local function buildShieldAndProtect(character)
@@ -10236,6 +10306,7 @@ addCommand({
                     hum:ChangeState(Enum.HumanoidStateType.GettingUp)
                     task.spawn(function()
                         rebuildJoints(character)
+                        reattachAccessories(character)
                     end)
                 end
             end)
@@ -10258,13 +10329,25 @@ addCommand({
                 if not _G.AntiKillActive[target.UserId] then return end
                 if child:IsA("Accessory") then
                     task.spawn(function()
-                        task.wait(0.05)
+                        task.wait(0.03)
                         if child and child.Parent == nil then
                             child.Parent = character
                             local handle = child:FindFirstChild("Handle")
                             if handle then
                                 handle.CanCollide = false
                                 handle.Massless = true
+                                local w = handle:FindFirstChildOfClass("WeldConstraint")
+                                    or handle:FindFirstChildOfClass("Weld")
+                                if not w then
+                                    local attachPoint = character:FindFirstChild("Head")
+                                        or character:FindFirstChild("HumanoidRootPart")
+                                    if attachPoint then
+                                        local newW = Instance.new("WeldConstraint")
+                                        newW.Part0 = handle
+                                        newW.Part1 = attachPoint
+                                        newW.Parent = handle
+                                    end
+                                end
                             end
                         end
                     end)
@@ -10294,14 +10377,31 @@ addCommand({
                     end
 
                     if child:IsA("Humanoid") then
-                        local newHum = Instance.new("Humanoid")
-                        newHum.MaxHealth = math.huge
-                        newHum.Health = math.huge
-                        newHum.BreakJointsOnDeath = false
-                        newHum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-                        newHum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-                        newHum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-                        newHum.Parent = character
+                        task.spawn(function()
+                            local newHum = rebuildHumanoid(character)
+
+                            local newHealthConn = newHum:GetPropertyChangedSignal("Health"):Connect(function()
+                                if not _G.AntiKillActive[target.UserId] then return end
+                                if newHum.Health < math.huge then
+                                    newHum.Health = math.huge
+                                end
+                            end)
+
+                            local newStateConn = newHum.StateChanged:Connect(function(old, new)
+                                if not _G.AntiKillActive[target.UserId] then return end
+                                if new == Enum.HumanoidStateType.Dead then
+                                    newHum.Health = math.huge
+                                    newHum:ChangeState(Enum.HumanoidStateType.GettingUp)
+                                    task.spawn(function()
+                                        rebuildJoints(character)
+                                        reattachAccessories(character)
+                                    end)
+                                end
+                            end)
+
+                            table.insert(_G.AntiKillConnections[target.UserId], newHealthConn)
+                            table.insert(_G.AntiKillConnections[target.UserId], newStateConn)
+                        end)
                     end
                 end)
             end)
