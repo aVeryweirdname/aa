@@ -10012,7 +10012,7 @@ addCommand({
 addCommand({
     name = "antikill",
     aliases = {"ak", "godmode"},
-    desc = "Extremely powerful protection against all forms of death",
+    desc = "extremely powerful protection against all forms of death",
     usage = prefix .. "antikill [player (optional)] [true/false]",
     rank = RANKS.MODERATOR,
     callback = function(plr, args)
@@ -10040,7 +10040,6 @@ addCommand({
 
         if toggle == false then
             _G.AntiKillActive[target.UserId] = false
-
             if _G.AntiKillConnections[target.UserId] then
                 for _, conn in ipairs(_G.AntiKillConnections[target.UserId]) do
                     if conn then conn:Disconnect() end
@@ -10061,7 +10060,6 @@ addCommand({
                     hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
                 end
             end
-
             notify(plr, "Sentrius", "Antikill disabled for " .. target.DisplayName .. ".", 3)
             if target ~= plr then
                 notify(target, "Sentrius", "Your antikill protection has been removed.", 3)
@@ -10082,7 +10080,7 @@ addCommand({
         }
 
         local function lockAllParts(character)
-            for _, part in ipairs(character:GetDescendants()) do
+            for _,part in ipairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then
                     part.Locked = true
                     part.Anchored = false
@@ -10093,10 +10091,6 @@ addCommand({
         local function restoreAnimations(character)
             local hum = character:FindFirstChildOfClass("Humanoid")
             if not hum then return end
-
-            local animController = character:FindFirstChildOfClass("AnimationController")
-                or character:FindFirstChild("Animate")
-
             local animate = character:FindFirstChild("Animate")
             if animate then
                 animate.Disabled = true
@@ -10121,38 +10115,25 @@ addCommand({
         local function reattachAccessories(character)
             local hrp2 = character:FindFirstChild("HumanoidRootPart")
             local head = character:FindFirstChild("Head")
-
             for _, item in ipairs(character:GetChildren()) do
                 if item:IsA("Accessory") then
                     local handle = item:FindFirstChild("Handle")
                     if handle then
                         handle.CanCollide = false
                         handle.Massless = true
-
-                        local existingWeld = handle:FindFirstChildOfClass("Weld")
-                            or handle:FindFirstChildOfClass("WeldConstraint")
-
-                        if not existingWeld then
-                            local attachPoint = head or hrp2
-                            if attachPoint then
-                                local w = Instance.new("WeldConstraint")
-                                w.Part0 = handle
-                                w.Part1 = attachPoint
-                                w.Parent = handle
+                        handle.Velocity = Vector3.new(0,0,0)
+                        handle.RotVelocity = Vector3.new(0,0,0)
+                        for _, w in ipairs(handle:GetChildren()) do
+                            if w:IsA("Weld") or w:IsA("WeldConstraint") or w:IsA("Motor6D") then
+                                w:Destroy()
                             end
-                        else
-                            if existingWeld:IsA("Weld") then
-                                if not existingWeld.Part0 or not existingWeld.Part1 then
-                                    existingWeld:Destroy()
-                                    local attachPoint = head or hrp2
-                                    if attachPoint then
-                                        local w = Instance.new("WeldConstraint")
-                                        w.Part0 = handle
-                                        w.Part1 = attachPoint
-                                        w.Parent = handle
-                                    end
-                                end
-                            end
+                        end
+                        local attachPoint = head or hrp2
+                        if attachPoint then
+                            local w = Instance.new("WeldConstraint")
+                            w.Part0 = handle
+                            w.Part1 = attachPoint
+                            w.Parent = handle
                         end
                     end
                 end
@@ -10162,7 +10143,6 @@ addCommand({
         local function rebuildJoints(character)
             if rebuildingJoints then return end
             rebuildingJoints = true
-
             local torso = character:FindFirstChild("Torso")
             local hrp = character:FindFirstChild("HumanoidRootPart")
             local head = character:FindFirstChild("Head")
@@ -10170,12 +10150,10 @@ addCommand({
             local rightArm = character:FindFirstChild("Right Arm")
             local leftLeg = character:FindFirstChild("Left Leg")
             local rightLeg = character:FindFirstChild("Right Leg")
-
             if not torso or not hrp then
                 rebuildingJoints = false
                 return
             end
-
             local function ensureJoint(parent, name, part0, part1, c0, c1)
                 local existing = parent:FindFirstChild(name)
                 if existing and existing:IsA("Motor6D") then
@@ -10195,47 +10173,34 @@ addCommand({
                 joint.Parent = parent
                 return joint
             end
-
             ensureJoint(hrp, "RootJoint", hrp, torso,
-                CFrame.new(0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 1, 0),
-                CFrame.new(0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 1, 0)
-            )
-
+                CFrame.new(0,0,0,-1,0,0,0,0,1,0,1,0),
+                CFrame.new(0,0,0,-1,0,0,0,0,1,0,1,0))
             if head then
                 ensureJoint(torso, "Neck", torso, head,
-                    CFrame.new(0, 1, 0, -1, 0, 0, 0, 0, 1, 0, 1, 0),
-                    CFrame.new(0, -0.5, 0, -1, 0, 0, 0, 0, 1, 0, 1, 0)
-                )
+                    CFrame.new(0,1,0,-1,0,0,0,0,1,0,1,0),
+                    CFrame.new(0,-0.5,0,-1,0,0,0,0,1,0,1,0))
             end
-
             if leftArm then
                 ensureJoint(torso, "Left Shoulder", torso, leftArm,
-                    CFrame.new(-1, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0),
-                    CFrame.new(0.5, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-                )
+                    CFrame.new(-1,0.5,0,0,0,-1,0,1,0,1,0,0),
+                    CFrame.new(0.5,0.5,0,0,0,-1,0,1,0,1,0,0))
             end
-
             if rightArm then
                 ensureJoint(torso, "Right Shoulder", torso, rightArm,
-                    CFrame.new(1, 0.5, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0),
-                    CFrame.new(-0.5, 0.5, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0)
-                )
+                    CFrame.new(1,0.5,0,0,0,1,0,1,0,-1,0,0),
+                    CFrame.new(-0.5,0.5,0,0,0,1,0,1,0,-1,0,0))
             end
-
             if leftLeg then
                 ensureJoint(torso, "Left Hip", torso, leftLeg,
-                    CFrame.new(-0.5, -1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0),
-                    CFrame.new(0, 1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-                )
+                    CFrame.new(-0.5,-1,0,0,0,-1,0,1,0,1,0,0),
+                    CFrame.new(0,1,0,0,0,-1,0,1,0,1,0,0))
             end
-
             if rightLeg then
                 ensureJoint(torso, "Right Hip", torso, rightLeg,
-                    CFrame.new(0.5, -1, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0),
-                    CFrame.new(0, 1, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0)
-                )
+                    CFrame.new(0.5,-1,0,0,0,1,0,1,0,-1,0,0),
+                    CFrame.new(0,1,0,0,0,1,0,1,0,-1,0,0))
             end
-
             lockAllParts(character)
             rebuildingJoints = false
         end
@@ -10243,7 +10208,6 @@ addCommand({
         local function rebuildHumanoid(character)
             local existing = character:FindFirstChildOfClass("Humanoid")
             if existing then existing:Destroy() end
-
             local newHum = Instance.new("Humanoid")
             newHum.MaxHealth = math.huge
             newHum.Health = math.huge
@@ -10252,14 +10216,11 @@ addCommand({
             newHum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
             newHum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
             newHum.Parent = character
-
             task.wait(0.05)
             rebuildJoints(character)
             reattachAccessories(character)
-
             task.wait(0.05)
             restoreAnimations(character)
-
             return newHum
         end
 
@@ -10267,30 +10228,25 @@ addCommand({
             if not character then return end
             local hum = character:FindFirstChildOfClass("Humanoid")
             if not hum then return end
-
             hum.MaxHealth = math.huge
             hum.Health = math.huge
             hum.BreakJointsOnDeath = false
-
             hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
             hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
             hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-
             local existingFF = character:FindFirstChildOfClass("ForceField")
             if not existingFF then
                 local ff = Instance.new("ForceField")
                 ff.Visible = false
                 ff.Parent = character
             end
-
             local existingShield = character:FindFirstChild("SentriusShield")
             if existingShield then existingShield:Destroy() end
-
             local hrp = character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 local shieldPart = Instance.new("Part")
                 shieldPart.Name = "SentriusShield"
-                shieldPart.Size = Vector3.new(8, 8, 8)
+                shieldPart.Size = Vector3.new(8,8,8)
                 shieldPart.Shape = Enum.PartType.Ball
                 shieldPart.Anchored = false
                 shieldPart.CanCollide = false
@@ -10303,7 +10259,6 @@ addCommand({
                 weld.Part1 = shieldPart
                 weld.Parent = shieldPart
             end
-
             rebuildJoints(character)
             lockAllParts(character)
             reattachAccessories(character)
@@ -10312,21 +10267,17 @@ addCommand({
         local function fullProtectionLoop(character)
             if not character then return end
             buildShieldAndProtect(character)
-
             local hrp = character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 lastSafeCFrame = hrp.CFrame
                 savedCFrame = hrp.CFrame
             end
-
             local hum = character:FindFirstChildOfClass("Humanoid")
             if not hum then return end
 
             local healthConn = hum:GetPropertyChangedSignal("Health"):Connect(function()
                 if not _G.AntiKillActive[target.UserId] then return end
-                if hum.Health < math.huge then
-                    hum.Health = math.huge
-                end
+                if hum.Health < math.huge then hum.Health = math.huge end
             end)
 
             local maxhealthConn = hum:GetPropertyChangedSignal("MaxHealth"):Connect(function()
@@ -10367,24 +10318,27 @@ addCommand({
                 if not _G.AntiKillActive[target.UserId] then return end
                 if child:IsA("Accessory") then
                     task.spawn(function()
-                        task.wait(0.03)
+                        task.wait(0.01)
                         if child and child.Parent == nil then
                             child.Parent = character
                             local handle = child:FindFirstChild("Handle")
                             if handle then
                                 handle.CanCollide = false
                                 handle.Massless = true
-                                local w = handle:FindFirstChildOfClass("WeldConstraint")
-                                    or handle:FindFirstChildOfClass("Weld")
-                                if not w then
-                                    local attachPoint = character:FindFirstChild("Head")
-                                        or character:FindFirstChild("HumanoidRootPart")
-                                    if attachPoint then
-                                        local newW = Instance.new("WeldConstraint")
-                                        newW.Part0 = handle
-                                        newW.Part1 = attachPoint
-                                        newW.Parent = handle
+                                handle.Velocity = Vector3.new(0,0,0)
+                                handle.RotVelocity = Vector3.new(0,0,0)
+                                for _, w in ipairs(handle:GetChildren()) do
+                                    if w:IsA("Weld") or w:IsA("WeldConstraint") or w:IsA("Motor6D") then
+                                        w:Destroy()
                                     end
+                                end
+                                local attachPoint = character:FindFirstChild("Head")
+                                    or character:FindFirstChild("HumanoidRootPart")
+                                if attachPoint then
+                                    local newW = Instance.new("WeldConstraint")
+                                    newW.Part0 = handle
+                                    newW.Part1 = attachPoint
+                                    newW.Parent = handle
                                 end
                             end
                         end
@@ -10397,34 +10351,26 @@ addCommand({
                 task.spawn(function()
                     task.wait(0.03)
                     if not character.Parent then return end
-
                     if child:IsA("ForceField") then
                         local ff = Instance.new("ForceField")
                         ff.Visible = false
                         ff.Parent = character
                     end
-
                     if child.Name == "SentriusShield" then
                         buildShieldAndProtect(character)
                     end
-
                     if child:IsA("Motor6D") or child.Name == "Torso" or child.Name == "Head"
                         or child.Name == "Left Arm" or child.Name == "Right Arm"
                         or child.Name == "Left Leg" or child.Name == "Right Leg" then
                         rebuildJoints(character)
                     end
-
                     if child:IsA("Humanoid") then
                         task.spawn(function()
                             local newHum = rebuildHumanoid(character)
-
                             local newHealthConn = newHum:GetPropertyChangedSignal("Health"):Connect(function()
                                 if not _G.AntiKillActive[target.UserId] then return end
-                                if newHum.Health < math.huge then
-                                    newHum.Health = math.huge
-                                end
+                                if newHum.Health < math.huge then newHum.Health = math.huge end
                             end)
-
                             local newStateConn = newHum.StateChanged:Connect(function(old, new)
                                 if not _G.AntiKillActive[target.UserId] then return end
                                 if new == Enum.HumanoidStateType.Dead then
@@ -10436,7 +10382,6 @@ addCommand({
                                     end)
                                 end
                             end)
-
                             table.insert(_G.AntiKillConnections[target.UserId], newHealthConn)
                             table.insert(_G.AntiKillConnections[target.UserId], newStateConn)
                         end)
@@ -10452,9 +10397,7 @@ addCommand({
                         or desc.Name == "Left Hip" or desc.Name == "Right Hip" then
                         task.spawn(function()
                             task.wait(0.03)
-                            if character.Parent then
-                                rebuildJoints(character)
-                            end
+                            if character.Parent then rebuildJoints(character) end
                         end)
                     end
                 end
@@ -10463,10 +10406,8 @@ addCommand({
             local heartbeatConn = game:GetService("RunService").Heartbeat:Connect(function()
                 if not _G.AntiKillActive[target.UserId] then return end
                 if not character or not character.Parent then return end
-
                 local currentHrp = character:FindFirstChild("HumanoidRootPart")
                 if not currentHrp then return end
-
                 local currentPos = currentHrp.Position
                 local isInVoid = currentPos.Y < -150
 
@@ -10477,16 +10418,23 @@ addCommand({
                         lastSafeTime = tick()
                     end
                 else
-                    if lastSafeCFrame then
+                    local baseplate = workspace:FindFirstChild("Baseplate")
+                        or workspace:FindFirstChild("Base")
+                    if baseplate and baseplate:IsA("BasePart") then
+                        local bpTop = baseplate.Position.Y + (baseplate.Size.Y / 2)
+                        local safeY = bpTop + 3.5
+                        local safeCF = CFrame.new(Vector3.new(currentHrp.CFrame.X, safeY, currentHrp.CFrame.Z))
+                        currentHrp.CFrame = safeCF
+                        lastSafeCFrame = safeCF
+                        savedCFrame = safeCF
+                    elseif lastSafeCFrame then
                         currentHrp.CFrame = lastSafeCFrame
                     end
                 end
 
                 local currentHum = character:FindFirstChildOfClass("Humanoid")
                 if currentHum then
-                    if currentHum.Health < math.huge then
-                        currentHum.Health = math.huge
-                    end
+                    if currentHum.Health < math.huge then currentHum.Health = math.huge end
                     if currentHum.MaxHealth ~= math.huge then
                         currentHum.MaxHealth = math.huge
                         currentHum.Health = math.huge
@@ -10504,14 +10452,9 @@ addCommand({
                         if not j and jname == "RootJoint" then
                             j = currentHrp:FindFirstChild("RootJoint")
                         end
-                        if not j then
-                            missingJoint = true
-                            break
-                        end
+                        if not j then missingJoint = true break end
                     end
-                    if missingJoint then
-                        rebuildJoints(character)
-                    end
+                    if missingJoint then rebuildJoints(character) end
                 end
 
                 if not character:FindFirstChildOfClass("ForceField") then
