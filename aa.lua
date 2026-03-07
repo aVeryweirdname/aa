@@ -10073,10 +10073,32 @@ addCommand({
         local lastSafeCFrame = nil
         local lastSafeTime = tick()
         local rebuildingJoints = false
+        local stabilizing = false
 
         local jointNames = {
             "Left Shoulder", "Right Shoulder", "Left Hip", "Right Hip", "Neck", "RootJoint"
         }
+
+        local function getBaseplate()
+            local bp = nil
+            pcall(function()
+                bp = workspace.Tabby.Admin_House.Baseplate
+            end)
+            return bp
+        end
+
+        local function getSafeSpawnCFrame(currentHrp)
+            local bp = getBaseplate()
+            if bp and bp:IsA("BasePart") then
+                local bpTop = bp.Position.Y + (bp.Size.Y / 2)
+                return CFrame.new(Vector3.new(bp.Position.X, bpTop + 3.5, bp.Position.Z))
+            elseif lastSafeCFrame then
+                return lastSafeCFrame
+            elseif currentHrp then
+                return currentHrp.CFrame
+            end
+            return CFrame.new(0,10,0)
+        end
 
         local function lockAllParts(character)
             for _,part in ipairs(character:GetDescendants()) do
@@ -10106,34 +10128,6 @@ addCommand({
             idleAnim.AnimationId = "rbxassetid://180435571"
             local track = hum:LoadAnimation(idleAnim)
             track:Play()
-        end
-
-        local function reattachAccessories(character)
-            local hrp2 = character:FindFirstChild("HumanoidRootPart")
-            if not hrp2 then return end
-            for _, item in ipairs(character:GetChildren()) do
-                if item:IsA("Accessory") then
-                    local handle = item:FindFirstChild("Handle")
-                    if handle then
-                        handle.CanCollide = false
-                        handle.Massless = true
-                        handle.Velocity = Vector3.new(0,0,0)
-                        handle.RotVelocity = Vector3.new(0,0,0)
-                        handle.Anchored = false
-                        for _, w in ipairs(handle:GetChildren()) do
-                            if w:IsA("Weld") or w:IsA("WeldConstraint") or w:IsA("Motor6D") or w:IsA("HingeConstraint") or w:IsA("BallSocketConstraint") then
-                                w:Destroy()
-                            end
-                        end
-                        local w = Instance.new("Weld")
-                        w.Part0 = hrp2
-                        w.Part1 = handle
-                        w.C0 = hrp2.CFrame:Inverse() * handle.CFrame
-                        w.C1 = CFrame.new(0,0,0)
-                        w.Parent = handle
-                    end
-                end
-            end
         end
 
         local function rebuildJoints(character)
@@ -10214,7 +10208,6 @@ addCommand({
             newHum.Parent = character
             task.wait(0.05)
             rebuildJoints(character)
-            reattachAccessories(character)
             task.wait(0.05)
             restoreAnimations(character)
             return newHum
@@ -10257,7 +10250,27 @@ addCommand({
             end
             rebuildJoints(character)
             lockAllParts(character)
-            reattachAccessories(character)
+        end
+
+        local function stabilizeToBaseplate(character, hrp)
+            if stabilizing then return end
+            stabilizing = true
+            task.spawn(function()
+                local safeCF = getSafeSpawnCFrame(hrp)
+                for i = 1, 6 do
+                    if not _G.AntiKillActive[target.UserId] then break end
+                    local h = character:FindFirstChild("HumanoidRootPart")
+                    if not h then break end
+                    h.CFrame = safeCF
+                    h.Velocity = Vector3.new(0,0,0)
+                    h.RotVelocity = Vector3.new(0,0,0)
+                    task.wait(0.1)
+                end
+                lastSafeCFrame = safeCF
+                savedCFrame = safeCF
+                lastSafeTime = tick()
+                stabilizing = false
+            end)
         end
 
         local function fullProtectionLoop(character)
@@ -10291,7 +10304,6 @@ addCommand({
                     hum:ChangeState(Enum.HumanoidStateType.GettingUp)
                     task.spawn(function()
                         rebuildJoints(character)
-                        reattachAccessories(character)
                     end)
                 end
             end)
@@ -10302,46 +10314,11 @@ addCommand({
                 task.spawn(function()
                     task.wait(0.05)
                     rebuildJoints(character)
-                    reattachAccessories(character)
                     local currentHrp = character:FindFirstChild("HumanoidRootPart")
-                    if savedCFrame and currentHrp and currentHrp.Parent then
-                        currentHrp.CFrame = savedCFrame
+                    if currentHrp then
+                        stabilizeToBaseplate(character, currentHrp)
                     end
                 end)
-            end)
-
-            local accessoryDropConn = character.ChildRemoved:Connect(function(child)
-                if not _G.AntiKillActive[target.UserId] then return end
-                if child:IsA("Accessory") then
-                    task.spawn(function()
-                        task.wait(0.01)
-                        if child and child.Parent == nil then
-                            child.Parent = character
-                            local handle = child:FindFirstChild("Handle")
-                            if handle then
-                                handle.CanCollide = false
-                                handle.Massless = true
-                                handle.Velocity = Vector3.new(0,0,0)
-                                handle.RotVelocity = Vector3.new(0,0,0)
-                                handle.Anchored = false
-                                for _, w in ipairs(handle:GetChildren()) do
-                                    if w:IsA("Weld") or w:IsA("WeldConstraint") or w:IsA("Motor6D") or w:IsA("HingeConstraint") or w:IsA("BallSocketConstraint") then
-                                        w:Destroy()
-                                    end
-                                end
-                                local hrpRef = character:FindFirstChild("HumanoidRootPart")
-                                if hrpRef then
-                                    local newW = Instance.new("Weld")
-                                    newW.Part0 = hrpRef
-                                    newW.Part1 = handle
-                                    newW.C0 = hrpRef.CFrame:Inverse() * handle.CFrame
-                                    newW.C1 = CFrame.new(0,0,0)
-                                    newW.Parent = handle
-                                end
-                            end
-                        end
-                    end)
-                end
             end)
 
             local childRemovedConn = character.ChildRemoved:Connect(function(child)
@@ -10374,10 +10351,7 @@ addCommand({
                                 if new == Enum.HumanoidStateType.Dead then
                                     newHum.Health = math.huge
                                     newHum:ChangeState(Enum.HumanoidStateType.GettingUp)
-                                    task.spawn(function()
-                                        rebuildJoints(character)
-                                        reattachAccessories(character)
-                                    end)
+                                    task.spawn(function() rebuildJoints(character) end)
                                 end
                             end)
                             table.insert(_G.AntiKillConnections[target.UserId], newHealthConn)
@@ -10406,29 +10380,20 @@ addCommand({
                 if not character or not character.Parent then return end
                 local currentHrp = character:FindFirstChild("HumanoidRootPart")
                 if not currentHrp then return end
+
+                local vel = currentHrp.Velocity
+                local speed = Vector3.new(vel.X, 0, vel.Z).Magnitude
                 local currentPos = currentHrp.Position
                 local isInVoid = currentPos.Y < -150
+                local isFlung = speed > 120
 
-                if not isInVoid then
+                if isInVoid or isFlung then
+                    stabilizeToBaseplate(character, currentHrp)
+                elseif not stabilizing then
                     if tick() - lastSafeTime > 0.3 then
                         lastSafeCFrame = currentHrp.CFrame
                         savedCFrame = currentHrp.CFrame
                         lastSafeTime = tick()
-                    end
-                else
-                    local baseplate = nil
-                    pcall(function()
-                        baseplate = workspace.Tabby.Admin_House.Baseplate
-                    end)
-                    if baseplate and baseplate:IsA("BasePart") then
-                        local bpTop = baseplate.Position.Y + (baseplate.Size.Y / 2)
-                        local safeY = bpTop + 3.5
-                        local safeCF = CFrame.new(Vector3.new(currentHrp.CFrame.X, safeY, currentHrp.CFrame.Z))
-                        currentHrp.CFrame = safeCF
-                        lastSafeCFrame = safeCF
-                        savedCFrame = safeCF
-                    elseif lastSafeCFrame then
-                        currentHrp.CFrame = lastSafeCFrame
                     end
                 end
 
@@ -10468,7 +10433,6 @@ addCommand({
             table.insert(_G.AntiKillConnections[target.UserId], maxhealthConn)
             table.insert(_G.AntiKillConnections[target.UserId], stateConn)
             table.insert(_G.AntiKillConnections[target.UserId], diedConn)
-            table.insert(_G.AntiKillConnections[target.UserId], accessoryDropConn)
             table.insert(_G.AntiKillConnections[target.UserId], childRemovedConn)
             table.insert(_G.AntiKillConnections[target.UserId], descendantRemovedConn)
             table.insert(_G.AntiKillConnections[target.UserId], heartbeatConn)
