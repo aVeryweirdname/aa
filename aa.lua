@@ -10046,7 +10046,6 @@ addCommand({
                 end
                 _G.AntiKillConnections[target.UserId] = nil
             end
-
             if target.Character then
                 local shield = target.Character:FindFirstChild("SentriusShield")
                 if shield then shield:Destroy() end
@@ -10098,14 +10097,11 @@ addCommand({
                 animate.Disabled = false
                 return
             end
-
             local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
             if not humanoidRootPart then return end
-
             for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
                 track:Stop()
             end
-
             local idleAnim = Instance.new("Animation")
             idleAnim.AnimationId = "rbxassetid://180435571"
             local track = hum:LoadAnimation(idleAnim)
@@ -10114,7 +10110,7 @@ addCommand({
 
         local function reattachAccessories(character)
             local hrp2 = character:FindFirstChild("HumanoidRootPart")
-            local head = character:FindFirstChild("Head")
+            if not hrp2 then return end
             for _, item in ipairs(character:GetChildren()) do
                 if item:IsA("Accessory") then
                     local handle = item:FindFirstChild("Handle")
@@ -10123,18 +10119,18 @@ addCommand({
                         handle.Massless = true
                         handle.Velocity = Vector3.new(0,0,0)
                         handle.RotVelocity = Vector3.new(0,0,0)
+                        handle.Anchored = false
                         for _, w in ipairs(handle:GetChildren()) do
-                            if w:IsA("Weld") or w:IsA("WeldConstraint") or w:IsA("Motor6D") then
+                            if w:IsA("Weld") or w:IsA("WeldConstraint") or w:IsA("Motor6D") or w:IsA("HingeConstraint") or w:IsA("BallSocketConstraint") then
                                 w:Destroy()
                             end
                         end
-                        local attachPoint = head or hrp2
-                        if attachPoint then
-                            local w = Instance.new("WeldConstraint")
-                            w.Part0 = handle
-                            w.Part1 = attachPoint
-                            w.Parent = handle
-                        end
+                        local w = Instance.new("Weld")
+                        w.Part0 = hrp2
+                        w.Part1 = handle
+                        w.C0 = hrp2.CFrame:Inverse() * handle.CFrame
+                        w.C1 = CFrame.new(0,0,0)
+                        w.Parent = handle
                     end
                 end
             end
@@ -10327,17 +10323,19 @@ addCommand({
                                 handle.Massless = true
                                 handle.Velocity = Vector3.new(0,0,0)
                                 handle.RotVelocity = Vector3.new(0,0,0)
+                                handle.Anchored = false
                                 for _, w in ipairs(handle:GetChildren()) do
-                                    if w:IsA("Weld") or w:IsA("WeldConstraint") or w:IsA("Motor6D") then
+                                    if w:IsA("Weld") or w:IsA("WeldConstraint") or w:IsA("Motor6D") or w:IsA("HingeConstraint") or w:IsA("BallSocketConstraint") then
                                         w:Destroy()
                                     end
                                 end
-                                local attachPoint = character:FindFirstChild("Head")
-                                    or character:FindFirstChild("HumanoidRootPart")
-                                if attachPoint then
-                                    local newW = Instance.new("WeldConstraint")
-                                    newW.Part0 = handle
-                                    newW.Part1 = attachPoint
+                                local hrpRef = character:FindFirstChild("HumanoidRootPart")
+                                if hrpRef then
+                                    local newW = Instance.new("Weld")
+                                    newW.Part0 = hrpRef
+                                    newW.Part1 = handle
+                                    newW.C0 = hrpRef.CFrame:Inverse() * handle.CFrame
+                                    newW.C1 = CFrame.new(0,0,0)
                                     newW.Parent = handle
                                 end
                             end
@@ -10418,8 +10416,10 @@ addCommand({
                         lastSafeTime = tick()
                     end
                 else
-                    local baseplate = workspace:FindFirstChild("Baseplate")
-                        or workspace:FindFirstChild("Base")
+                    local baseplate = nil
+                    pcall(function()
+                        baseplate = workspace.Tabby.Admin_House.Baseplate
+                    end)
                     if baseplate and baseplate:IsA("BasePart") then
                         local bpTop = baseplate.Position.Y + (baseplate.Size.Y / 2)
                         local safeY = bpTop + 3.5
